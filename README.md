@@ -16,13 +16,20 @@ Core Objective: To demonstrate a rigorous embedded firmware development workflow
 
 ---
 
+
 ## Build & Upload
 
+### GPIO
 ```bash
-pio run
-pio run -t upload
+pio run -e gpio
+pio run -e gpio -t upload
 ```
-
+Other Examples:
+```bash
+pio run -e uart -t upload
+pio run -e spiMaster -t upload
+pio run -e i2cMaster -t upload
+```
 ---
 
 ## Design Philosophy
@@ -54,18 +61,37 @@ This project is built upon the following engineering principles:
 ## Project Structure
 
 ```text
-.
-├── include/
-│   ├── driver_gpio.h       # Pin definitions and bit-manipulation macros
-│   ├── driver_uart.h       # Configuration structures and UART prototypes
-│   ├── driver_spi.h        # SPI communication interface declarations
-│   └── driver_i2c.h        # TWI state management and I2C protocol
-├── src/
-|   ├── driver_gpio.c       # GPIO control logic implementation
-│   ├── driver_uart.c       # ISR management and Ring Buffer logic
-│   ├── driver_spi.c        # SPI transfer implementation
-│   ├── driver_i2c.c        # I2C/TWI protocol handling
-│   └── main.c              # Integrated driver demonstration
-├── examples/               # Standalone examples for each module
-├── platformio.ini          # Build and upload configuration
-└── README.md
+AVRLOWLEVELREGISTER/
+├── .pio/                   
+├── .vscode/                
+│   ├── c_cpp_properties.json
+│   ├── extensions.json
+│   └── launch.json
+├── include/              
+│   └── README
+├── lib/                    
+│   └── gpio/               
+│       ├── driver_gpio.c
+│       └── driver_gpio.h
+|    └── uart/
+│       ├── driver_uart.c
+│       └── driver_uart.h
+|    └── spiMaster/
+│       ├── driver_spi.c
+│       └── driver_spi.h
+|    └── i2cMaster/
+│       ├── driver_i2c.c
+│       └── driver_i2c.h
+├── src/                    
+│   ├── gpio/
+│   │   └── main.c
+│   ├── i2cMaster/    
+│   │   └── main.c      
+│   ├── spiMaster/ 
+│   │   └── main.c         
+│   └── uart/          
+│       └── main.c    
+├── test/                  
+├── .gitignore          
+├── platformio.ini         
+└── README.md             

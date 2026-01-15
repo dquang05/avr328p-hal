@@ -136,8 +136,8 @@ void example_traffic_light(void) {
 int main(void) {
     // Choose one example to run:
     
-    example_led_blink();           // Example 1: Basic blink
-    // example_led_toggle();       // Example 2: Blink using toggle
+    // example_led_blink();           // Example 1: Basic blink
+    example_led_toggle();       // Example 2: Blink using toggle
     // example_button_led();       // Example 3: Button control
     // example_multiple_leds();    // Example 4: Multiple LEDs
     // example_sensor_reading();   // Example 5: Digital sensor

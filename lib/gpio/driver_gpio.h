@@ -1,12 +1,10 @@
-#pragma once
-
+#ifndef DRIVER_GPIO_H
+#define DRIVER_GPIO_H
 #include <stdint.h>
 #include <stdbool.h>
 #include <avr/io.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+
 
 typedef uint8_t gpio_pin_t;
 
@@ -34,6 +32,6 @@ bool gpio_write(gpio_pin_t pin, gpio_level_t level);
 int8_t gpio_read(gpio_pin_t pin);      // return 0/1, or -1 if invalid pin
 bool gpio_toggle(gpio_pin_t pin);
 
-#ifdef __cplusplus
-}
+
 #endif
+

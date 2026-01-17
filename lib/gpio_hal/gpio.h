@@ -1,5 +1,5 @@
-#ifndef DRIVER_GPIO_H
-#define DRIVER_GPIO_H
+#ifndef GPIO_H
+#define GPIO_H
 #include <stdint.h>
 #include <stdbool.h>
 #include <avr/io.h>

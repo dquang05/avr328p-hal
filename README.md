@@ -10,7 +10,6 @@ Core Objective: To demonstrate a rigorous embedded firmware development workflow
 
 - **GPIO**: Direct manipulation of DDRx, PORTx, and PINx registers. Includes flexible pin mapping for Arduino Uno/Nano form factors.
 - **UART (USART0)**: Configurable baud rate, featuring an interrupt-driven architecture (ISR) combined with a Ring Buffer for reliable asynchronous data handling.
-- **SPI Master**: Supports configurable Clock Prescalers, Data Order, and synchronous transfer modes.
 - **I2C (TWI) Master**: Full implementation of Start/Stop sequences, ACK/NACK handshaking, and helper functions for interfacing with external sensor registers.
 - **Development Environment**: Fully compatible with the PlatformIO ecosystem (avr-gcc) and flashed via avrdude.
 

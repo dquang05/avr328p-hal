@@ -1,3 +1,5 @@
+// This driver does not enable internal pull-ups by default; 
+// Hardware pull-ups are treated as a board-level requirement
 // 1) Status-driven state checks:
 //      - After every TWI action (START, SLA+R/W, DATA, RX), wait for TWINT and then verify TWSR.
 //      - Each step maps the hardware status into a small set of return codes:
@@ -179,14 +181,130 @@ void i2c_stop(void)
     }
 }
 
-i2c_status_t i2c_write(uint8_t data);
+// --------- WRITE / READ ----------
+i2c_status_t i2c_write(uint8_t data) {
+    TWDR = data;
+    TWCR = (1 << TWINT) | (1 << TWEN);
 
-i2c_status_t i2c_read_ack(uint8_t *out);
-i2c_status_t i2c_read_nack(uint8_t *out);
+    i2c_status_t st = twi_wait_twint();
+    if (st != I2C_OK) return st;
 
-// Helpers (khuyến nghị cho app layer)
-i2c_status_t i2c_write_bytes(uint8_t addr7, const uint8_t *data, uint16_t len);
-i2c_status_t i2c_read_bytes(uint8_t addr7, uint8_t *data, uint16_t len);
+    uint8_t s = twi_status();
+    if (s == TW_MT_DATA_ACK)  return I2C_OK;
+    if (s == TW_MT_DATA_NACK) return I2C_NACK;
 
-i2c_status_t i2c_write_reg(uint8_t addr7, uint8_t reg, const uint8_t *data, uint16_t len);
-i2c_status_t i2c_read_reg(uint8_t addr7, uint8_t reg, uint8_t *data, uint16_t len);
+    if (s == TW_MT_ARB_LOST) return I2C_ERROR;
+    if (s == TW_BUS_ERROR)   return I2C_ERROR;
+    return I2C_ERROR;
+}
+
+i2c_status_t i2c_read_ack(uint8_t *out) {
+    if (!out) return I2C_ERROR;
+
+    // TWEA=1 => return ACK after byte received (continue reading)
+    TWCR = (1 << TWINT) | (1 << TWEN) | (1 << TWEA);
+
+    i2c_status_t st = twi_wait_twint();
+    if (st != I2C_OK) return st;
+
+    uint8_t s = twi_status();
+    if (s != TW_MR_DATA_ACK) return I2C_ERROR;
+
+    *out = TWDR;
+    return I2C_OK;
+}
+
+i2c_status_t i2c_read_nack(uint8_t *out) {
+    if (!out) return I2C_ERROR;
+
+    // TWEA=0 => trả NACK sau byte cuối (kết thúc đọc)
+    TWCR = (1 << TWINT) | (1 << TWEN);
+
+    i2c_status_t st = twi_wait_twint();
+    if (st != I2C_OK) return st;
+
+    uint8_t s = twi_status();
+    if (s != TW_MR_DATA_NACK) return I2C_ERROR;
+
+    *out = TWDR;
+    return I2C_OK;
+}
+
+
+// --------- HELPERS ----------
+i2c_status_t i2c_write_bytes(uint8_t addr7, const uint8_t *data, uint16_t len) {
+    if (!data && len) return I2C_ERROR;
+
+    i2c_status_t st = i2c_start_write(addr7);
+    if (st != I2C_OK) { i2c_stop(); return st; }
+
+    for (uint16_t i = 0; i < len; i++) {
+        st = i2c_write(data[i]);
+        if (st != I2C_OK) { i2c_stop(); return st; }
+    }
+
+    i2c_stop();
+    return I2C_OK;
+}
+
+i2c_status_t i2c_read_bytes(uint8_t addr7, uint8_t *data, uint16_t len) {
+    if (!data && len) return I2C_ERROR;
+
+    i2c_status_t st = i2c_start_read(addr7);
+    if (st != I2C_OK) { i2c_stop(); return st; }
+
+    if (len == 0) { i2c_stop(); return I2C_OK; }
+
+    for (uint16_t i = 0; i < len; i++) {
+        if (i == (len - 1)) st = i2c_read_nack(&data[i]); // last byte => NACK
+        else                st = i2c_read_ack(&data[i]);  // remaining bytes => ACK
+
+        if (st != I2C_OK) { i2c_stop(); return st; }
+    }
+
+    i2c_stop();
+    return I2C_OK;
+}
+
+
+// Write register: START(W) + reg + data... + STOP
+i2c_status_t i2c_write_reg(uint8_t addr7, uint8_t reg, const uint8_t *data, uint16_t len) {
+    i2c_status_t st = i2c_start_write(addr7);
+    if (st != I2C_OK) { i2c_stop(); return st; }
+
+    st = i2c_write(reg);
+    if (st != I2C_OK) { i2c_stop(); return st; }
+
+    for (uint16_t i = 0; i < len; i++) {
+        st = i2c_write(data[i]);
+        if (st != I2C_OK) { i2c_stop(); return st; }
+    }
+
+    i2c_stop();
+    return I2C_OK;
+}
+
+// Read register: START(W) + reg + RESTART(R) + read... + STOP
+i2c_status_t i2c_read_reg(uint8_t addr7, uint8_t reg, uint8_t *data, uint16_t len) {
+    if (!data && len) return I2C_ERROR;
+
+    i2c_status_t st = i2c_start_write(addr7);
+    if (st != I2C_OK) { i2c_stop(); return st; }
+
+    st = i2c_write(reg);
+    if (st != I2C_OK) { i2c_stop(); return st; }
+
+    st = i2c_restart_read(addr7);
+    if (st != I2C_OK) { i2c_stop(); return st; }
+
+    if (len == 0) { i2c_stop(); return I2C_OK; }
+
+    for (uint16_t i = 0; i < len; i++) {
+        if (i == (len - 1)) st = i2c_read_nack(&data[i]); // last byte => NACK
+        else                st = i2c_read_ack(&data[i]);  // remaining bytes => ACK
+        if (st != I2C_OK) { i2c_stop(); return st; }
+    }
+
+    i2c_stop();
+    return I2C_OK;
+}

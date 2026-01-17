@@ -27,7 +27,7 @@ pio run -e gpio -t upload
 Other Examples:
 ```bash
 pio run -e uart -t upload
-pio run -e spiMaster -t upload
+pio run -e uart -t upload
 pio run -e i2cMaster -t upload
 ```
 ---
@@ -76,9 +76,6 @@ AVRLOWLEVELREGISTER/
 |    └── uart/
 │       ├── driver_uart.c
 │       └── driver_uart.h
-|    └── spiMaster/
-│       ├── driver_spi.c
-│       └── driver_spi.h
 |    └── i2cMaster/
 │       ├── driver_i2c.c
 │       └── driver_i2c.h
@@ -86,9 +83,7 @@ AVRLOWLEVELREGISTER/
 │   ├── gpio/
 │   │   └── main.c
 │   ├── i2cMaster/    
-│   │   └── main.c      
-│   ├── spiMaster/ 
-│   │   └── main.c         
+│   │   └── main.c               
 │   └── uart/          
 │       └── main.c    
 ├── test/                  

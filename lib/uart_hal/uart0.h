@@ -9,6 +9,11 @@
 #define F_CPU 16000000UL
 #endif
 
+// Default maximum timeout for UART operations ("no timeout" style)
+#ifndef UART0_TIMEOUT_MAX
+#define UART0_TIMEOUT_MAX 0xFFFFFFFFUL
+#endif
+
 typedef enum {
     UART_OK = 0,
     UART_ERR_PARAM,
@@ -58,9 +63,5 @@ uart_status_t uart0_write_line(const char *s, uint32_t timeout); // append "\r\n
 // ---------- RX (blocking/polling) ----------
 uart_status_t uart0_read_byte(uint8_t *out, uint32_t timeout);
 uart_status_t uart0_read(uint8_t *buf, size_t len, uint32_t timeout);
-
-// ---------- Status helpers ----------
-static inline bool uart0_tx_ready(void); // UDRE0
-static inline bool uart0_rx_ready(void); // RXC0
 
 #endif

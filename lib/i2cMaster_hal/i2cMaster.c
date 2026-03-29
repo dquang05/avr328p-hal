@@ -57,6 +57,7 @@
 // Misc
 #define TW_BUS_ERROR 0x00
 
+// --------- Low-level TWI operations ----------
 // Read twi status
 static inline uint8_t twi_status(void)
 {
@@ -133,10 +134,7 @@ void i2c_init(void)
     TWCR = (1 << TWEN);
 };
 
-//-------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------
+// --------- Public API (Byte level, IO)----------
 
 i2c_status_t i2c_start_write(uint8_t addr7)
 {
@@ -231,7 +229,7 @@ i2c_status_t i2c_read_nack(uint8_t *out) {
 }
 
 
-// --------- HELPERS ----------
+// Wrapper functions for common multi-byte operations (with proper START/STOP handling)
 i2c_status_t i2c_write_bytes(uint8_t addr7, const uint8_t *data, uint16_t len) {
     if (!data && len) return I2C_ERROR;
 

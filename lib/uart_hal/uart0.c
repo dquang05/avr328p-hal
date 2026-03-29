@@ -1,10 +1,6 @@
 #include "uart0.h"
 #include <avr/io.h>
 
-#ifndef UART0_TIMEOUT_MAX
-#define UART0_TIMEOUT_MAX 0xFFFFFFFFUL
-#endif
-
 // ----------------- Small helpers -----------------
 static inline bool uart0_tx_ready(void)
 {

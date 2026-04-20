@@ -12,21 +12,20 @@
 #define BL_UART_TIMEOUT     500000UL
 
 static void jump_to_app(void)
-{
-    void (*app_start)(void) = (void (*)(void))APP_START_ADDRESS;
+{   
+    void (*app_start)(void);
+    app_start = (void (*)(void))APP_START_ADDRESS;
 
     cli();
     wdt_disable();
+    uart0_deinit(); 
 
-    uart0_deinit(); // Just release resources
-    // app_start: pointer to the application start address.
-    // Call directly after declaration to jump to the application program
-    // (equivalent to a jump instruction to APP_START_ADDRESS and not returning to the bootloader).
+    // Jump to app after clear everything
     app_start();
 
     while (1)
     {
-        // Should never return here
+        // Just in case app_start returns (Some guy told)
     }
 }
 
@@ -40,6 +39,7 @@ static bool bootloader_should_enter(void)
         return false;
     }
 
+    // Entry bootloader condition
     if (cmd == BL_MAGIC_BYTE)
     {
         return true;
@@ -63,7 +63,7 @@ int main(void)
 
     if (uart0_init(&cfg) != UART_OK)
     {
-        // If UART init fails, do not stay here forever in step 1
+        // Incase UART init fails
         jump_to_app();
     }
 

@@ -2,6 +2,12 @@
 #include "gpio.h"
 #include <util/delay.h>
 
+void wdt_init(void) __attribute__((naked)) __attribute__((section(".init3")));
+void wdt_init(void) {
+    MCUSR = 0;
+    wdt_disable();
+}
+
 static void led_init(void) {
     gpio_pin_mode(PIN_D13, GPIO_OUTPUT);
     gpio_write(PIN_D13, GPIO_LOW);

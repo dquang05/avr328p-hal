@@ -1,21 +1,21 @@
-#include "gpio.h"
+#include <avr/io.h>
+#include <avr/wdt.h>
 #include <util/delay.h>
+#include "gpio.h"
 
-// Simple LED blink
-void example_led_blink(void) {
-    gpio_pin_mode(PIN_D13, GPIO_OUTPUT);
-    
-    while (1) {
-        gpio_write(PIN_D13, GPIO_HIGH);  // Turn LED ON
-        _delay_ms(1000);
-        gpio_write(PIN_D13, GPIO_LOW);   // Turn LED OFF
-        _delay_ms(1000);
-    }
+void wdt_init(void) __attribute__((naked)) __attribute__((section(".init3")));
+void wdt_init(void) {
+    MCUSR = 0;
+    wdt_disable();
 }
-
 
 int main(void) {
-    example_led_blink();
-    return 0;
-}
+    gpio_pin_mode(PIN_D8, GPIO_OUTPUT);
 
+    while (1) {
+        gpio_write(PIN_D8, GPIO_HIGH);
+        _delay_ms(100);
+        gpio_write(PIN_D8, GPIO_LOW);
+        _delay_ms(100);
+    }
+}

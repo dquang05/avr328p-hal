@@ -18,3 +18,41 @@ void wdt_init(void) {
 }
 ```
 This ensures the watchdog is cleared at startup and prevents the MCU from getting stuck in a reset loop before the main application begins (it can be observed by monitoring the behavior of PB5 - always HIGH).
+
+
+---
+
+## Bootloader linked to `0x0000` instead of Boot Loader Section
+
+### Symptom
+
+`avr-objdump` showed:
+
+```text
+.text  000001d2  00000000  00000000
+```
+
+The bootloader was built successfully, but the code was still placed at the application start address.
+
+### Cause
+Fuse bits and linker placement are independent:
+- Fuse bits decide where the CPU starts after reset.
+- The linker decides where the code is placed in Flash.
+
+### Fix
+Place at the bootloader start address:
+
+```ini
+build_flags =
+    -Wl,-Ttext=0x7C00
+```
+
+### Verify
+```bash
+avr-objdump -h .pio/build/bootloader/firmware.elf
+```
+
+### Expected
+```text
+.text  ...  00007c00  00007c00
+```

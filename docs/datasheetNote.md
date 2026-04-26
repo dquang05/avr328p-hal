@@ -62,3 +62,35 @@ To make the bootloader work correctly:
 - BOOTRST must direct reset to boot section
 - BOOTSZ must match the chosen bootloader size
 - clock fuse must match the UART baud calculation
+
+## Bootloader flash write notes
+
+### 1. Flash addressing model
+Program Flash is a single memory region, but it can be addressed in two ways:
+- word address (1 word = 2 bytes)
+- byte address
+
+### 2. boot_page_fill(addr, data) meaning
+For boot_page_fill(addr, data):
+- addr is a byte address
+- data is one word (16-bit)
+- the lower byte of data (LSB) goes to the lower byte address
+- the upper byte of data (MSB) goes to the higher byte address
+
+### 3. Byte-to-word packing example
+If the input buffer contains two bytes [0x11, 0x22], the word must be packed as 0x2211.
+
+### 4. Page-based Flash programming
+Flash is not programmed one standalone byte at a time.
+Programming is page-based.
+
+### 5. Minimal write sequence
+A minimal bootloader write flow is:
+- erase page
+- fill temporary page buffer word by word
+- write page
+- call boot_rww_enable
+
+### 6. Boot section requirement
+SPM (self-programming) instructions are only effective when code is running from the Boot Loader Section.
+

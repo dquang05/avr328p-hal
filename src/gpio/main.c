@@ -14,8 +14,8 @@ int main(void) {
 
     while (1) {
         gpio_write(PIN_D8, GPIO_HIGH);
-        _delay_ms(100);
+        _delay_ms(1000);
         gpio_write(PIN_D8, GPIO_LOW);
-        _delay_ms(100);
+        _delay_ms(1000);
     }
 }

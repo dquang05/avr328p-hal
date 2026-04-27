@@ -17,16 +17,22 @@ header = (
 checksum = (ord("W") + sum(header) + sum(data)) & 0xFF
 frame = b"W" + header + data + bytes([checksum])
 
-with serial.Serial(PORT, BAUD, timeout=2) as ser:
+with serial.Serial(PORT, BAUD, timeout=0.2) as ser:
     time.sleep(0.2)
+    ser.reset_input_buffer()
+    ser.reset_output_buffer()
 
-    print("Reset MCU now...")
-    time.sleep(1.5)
+    print("Reset MCU now, then press Enter immediately...")
+    input()
 
-    print("Boot message:", ser.readline())
-
+    # Send magic byte immediately after reset.
     ser.write(b"U")
-    print("Enter message:", ser.readline())
+
+    time.sleep(0.2)
+    data_in = ser.read(128)
+    print("Enter data:", data_in)
+
+    ser.reset_input_buffer()
 
     ser.write(b"P")
     print("Ping:", ser.read(1))

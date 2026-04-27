@@ -9,47 +9,53 @@
 
 #include "uart0.h"
 
-// Bootloader command definitions
+/* Bootloader command bytes */
 #define BL_ACK              'A'
 #define BL_NACK             'N'
 #define BL_CMD_P            'P'
 #define BL_CMD_W            'W'
 #define BL_CMD_J            'J'
 
-#define BL_PAGE_SIZE        ((uint16_t)SPM_PAGESIZE)
-#define BL_WRITE_TIMEOUT    UART0_TIMEOUT_MAX
-//Check docs
+/* Bootloader configuration */
 #define APP_START_ADDRESS   0x0000UL
+#define BOOT_START_ADDRESS  0x7C00UL
 #define BL_MAGIC_BYTE       'U'
 #define BL_UART_TIMEOUT     500000UL
-#define BOOT_START_ADDRESS  0x7C00UL // Bootloader start address 
-static uint8_t page_buf[SPM_PAGESIZE]; // It is 128 byte SRAM, safe for atmel (have 2KB SRAM)
-static uint8_t mcusr_mirror __attribute__((section(".noinit")));
 
+/* Flash page configuration */
+#define BL_PAGE_SIZE        ((uint16_t)SPM_PAGESIZE)
+#define BL_WRITE_TIMEOUT    UART0_TIMEOUT_MAX
+
+/* One flash page buffer. ATmega328P has 2 KB SRAM. */
+static uint8_t page_buf[SPM_PAGESIZE];
+
+/*
+ * Disable watchdog early after reset.
+ * This runs before main() from the .init3 section.
+ */
 void wdt_init(void) __attribute__((naked)) __attribute__((section(".init3")));
 
 void wdt_init(void)
 {
-    mcusr_mirror = MCUSR;
     MCUSR = 0;
     wdt_disable();
 }
 
 static void jump_to_app(void)
-{   
+{
     void (*app_start)(void);
+
     app_start = (void (*)(void))APP_START_ADDRESS;
 
     cli();
     wdt_disable();
-    uart0_deinit(); 
+    uart0_deinit();
 
-    // Jump to app after clear everything
     app_start();
 
     while (1)
     {
-        // Just in case app_start returns (Some guy told)
+        /* Should never return here. */
     }
 }
 
@@ -60,7 +66,7 @@ static bool is_valid_app_page(uint32_t page_addr)
         return false;
     }
 
-    if (page_addr > (BOOT_START_ADDRESS - SPM_PAGESIZE)) // fix: prevent writing to bootloader section
+    if (page_addr > (BOOT_START_ADDRESS - SPM_PAGESIZE))
     {
         return false;
     }
@@ -120,9 +126,11 @@ static bool boot_verify_page(uint32_t page_addr, const uint8_t *buf)
         return false;
     }
 
-    for (uint16_t i = 0; i < SPM_PAGESIZE; i++) // Check byte by byte
+    for (uint16_t i = 0; i < SPM_PAGESIZE; i++)
     {
-        uint8_t flash_byte = pgm_read_byte((const void *)(uintptr_t)(page_addr + i));
+        uint8_t flash_byte;
+
+        flash_byte = pgm_read_byte((const void *)(uintptr_t)(page_addr + i));
 
         if (flash_byte != buf[i])
         {
@@ -136,14 +144,15 @@ static bool boot_verify_page(uint32_t page_addr, const uint8_t *buf)
 static bool bootloader_should_enter(void)
 {
     uint8_t cmd = 0;
-    uart_status_t st = uart0_read_byte(&cmd, BL_UART_TIMEOUT);
+    uart_status_t st;
+
+    st = uart0_read_byte(&cmd, BL_UART_TIMEOUT);
 
     if (st != UART_OK)
     {
         return false;
     }
 
-    // Entry bootloader condition
     if (cmd == BL_MAGIC_BYTE)
     {
         return true;
@@ -168,9 +177,9 @@ static bool uart_read_bytes(uint8_t *dst, uint16_t len, uint8_t *sum)
             return false;
         }
 
-        dst[i] = b; // Buffer the byte
+        dst[i] = b;
 
-        if (sum != NULL) // Checksum
+        if (sum != NULL)
         {
             *sum = (uint8_t)(*sum + b);
         }
@@ -179,13 +188,13 @@ static bool uart_read_bytes(uint8_t *dst, uint16_t len, uint8_t *sum)
     return true;
 }
 
-static uint16_t read_u16_le(const uint8_t *p) // Little-endian 16-bit read
+static uint16_t read_u16_le(const uint8_t *p)
 {
     return ((uint16_t)p[0]) |
            ((uint16_t)p[1] << 8);
 }
 
-static uint32_t read_u32_le(const uint8_t *p) // Little-endian 32-bit read
+static uint32_t read_u32_le(const uint8_t *p)
 {
     return ((uint32_t)p[0]) |
            ((uint32_t)p[1] << 8) |
@@ -248,8 +257,6 @@ static bool bootloader_handle_write_page(void)
     return true;
 }
 
-// testing function here:
-// change: make it truely send W command and write page, also add verify step
 static void bootloader_process_command(void)
 {
     uint8_t cmd = 0;
@@ -302,7 +309,6 @@ int main(void)
 
     if (uart0_init(&cfg) != UART_OK)
     {
-        // Incase UART init fails
         jump_to_app();
     }
 

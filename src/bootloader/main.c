@@ -3,16 +3,27 @@
 #include <avr/wdt.h>
 #include <avr/boot.h>
 #include <avr/eeprom.h>
+#include <avr/pgmspace.h>
 #include <stdint.h>
 #include <stdbool.h>
 
 #include "uart0.h"
 
+// Bootloader command definitions
+#define BL_ACK              'A'
+#define BL_NACK             'N'
+#define BL_CMD_P            'P'
+#define BL_CMD_W            'W'
+#define BL_CMD_J            'J'
+
+#define BL_PAGE_SIZE        ((uint16_t)SPM_PAGESIZE)
+#define BL_WRITE_TIMEOUT    UART0_TIMEOUT_MAX
 //Check docs
 #define APP_START_ADDRESS   0x0000UL
 #define BL_MAGIC_BYTE       'U'
 #define BL_UART_TIMEOUT     500000UL
 #define BOOT_START_ADDRESS  0x7C00UL // Bootloader start address 
+static uint8_t page_buf[SPM_PAGESIZE]; // It is 128 byte SRAM, safe for atmel (have 2KB SRAM)
 static uint8_t mcusr_mirror __attribute__((section(".noinit")));
 
 void wdt_init(void) __attribute__((naked)) __attribute__((section(".init3")));
@@ -44,12 +55,12 @@ static void jump_to_app(void)
 
 static bool is_valid_app_page(uint32_t page_addr)
 {
-    if ((page_addr % SPM_PAGESIZE) != 0) // Ensure page_addr is page-aligned
+    if ((page_addr % SPM_PAGESIZE) != 0)
     {
         return false;
     }
 
-    if (page_addr >= BOOT_START_ADDRESS) // Must be below bootloader start address
+    if (page_addr > (BOOT_START_ADDRESS - SPM_PAGESIZE)) // fix: prevent writing to bootloader section
     {
         return false;
     }
@@ -97,6 +108,31 @@ static bool boot_program_page(uint32_t page_addr, const uint8_t *buf)
     return true;
 }
 
+static bool boot_verify_page(uint32_t page_addr, const uint8_t *buf)
+{
+    if (buf == NULL)
+    {
+        return false;
+    }
+
+    if (!is_valid_app_page(page_addr))
+    {
+        return false;
+    }
+
+    for (uint16_t i = 0; i < SPM_PAGESIZE; i++) // Check byte by byte
+    {
+        uint8_t flash_byte = pgm_read_byte((const void *)(uintptr_t)(page_addr + i));
+
+        if (flash_byte != buf[i])
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 static bool bootloader_should_enter(void)
 {
     uint8_t cmd = 0;
@@ -116,7 +152,104 @@ static bool bootloader_should_enter(void)
     return false;
 }
 
+static bool uart_read_bytes(uint8_t *dst, uint16_t len, uint8_t *sum)
+{
+    uint8_t b;
+
+    if (dst == NULL)
+    {
+        return false;
+    }
+
+    for (uint16_t i = 0; i < len; i++)
+    {
+        if (uart0_read_byte(&b, BL_WRITE_TIMEOUT) != UART_OK)
+        {
+            return false;
+        }
+
+        dst[i] = b; // Buffer the byte
+
+        if (sum != NULL) // Checksum
+        {
+            *sum = (uint8_t)(*sum + b);
+        }
+    }
+
+    return true;
+}
+
+static uint16_t read_u16_le(const uint8_t *p) // Little-endian 16-bit read
+{
+    return ((uint16_t)p[0]) |
+           ((uint16_t)p[1] << 8);
+}
+
+static uint32_t read_u32_le(const uint8_t *p) // Little-endian 32-bit read
+{
+    return ((uint32_t)p[0]) |
+           ((uint32_t)p[1] << 8) |
+           ((uint32_t)p[2] << 16) |
+           ((uint32_t)p[3] << 24);
+}
+
+static bool bootloader_handle_write_page(void)
+{
+    uint8_t header[6];
+    uint8_t calc_checksum = (uint8_t)BL_CMD_W;
+    uint8_t recv_checksum = 0;
+
+    uint32_t page_addr;
+    uint16_t len;
+
+    if (!uart_read_bytes(header, sizeof(header), &calc_checksum))
+    {
+        return false;
+    }
+
+    if (!uart_read_bytes(page_buf, BL_PAGE_SIZE, &calc_checksum))
+    {
+        return false;
+    }
+
+    if (uart0_read_byte(&recv_checksum, BL_WRITE_TIMEOUT) != UART_OK)
+    {
+        return false;
+    }
+
+    page_addr = read_u32_le(&header[0]);
+    len = read_u16_le(&header[4]);
+
+    if (recv_checksum != calc_checksum)
+    {
+        return false;
+    }
+
+    if (len != BL_PAGE_SIZE)
+    {
+        return false;
+    }
+
+    if (!is_valid_app_page(page_addr))
+    {
+        return false;
+    }
+
+    if (!boot_program_page(page_addr, page_buf))
+    {
+        return false;
+    }
+
+    if (!boot_verify_page(page_addr, page_buf))
+    {
+        return false;
+    }
+
+    return true;
+}
+
 // testing function here:
+// change: make it truely send W command and write page, also add verify step
 static void bootloader_process_command(void)
 {
     uint8_t cmd = 0;
@@ -128,21 +261,28 @@ static void bootloader_process_command(void)
 
     switch (cmd)
     {
-        case 'P':
-            (void)uart0_write_byte('A', UART0_TIMEOUT_MAX);
+        case BL_CMD_P:
+            (void)uart0_write_byte(BL_ACK, UART0_TIMEOUT_MAX);
             break;
 
-        case 'J':
-            (void)uart0_write_byte('A', UART0_TIMEOUT_MAX);
+        case BL_CMD_J:
+            (void)uart0_write_byte(BL_ACK, UART0_TIMEOUT_MAX);
             jump_to_app();
             break;
 
-        case 'W':
-            (void)uart0_write_byte('N', UART0_TIMEOUT_MAX);
+        case BL_CMD_W:
+            if (bootloader_handle_write_page())
+            {
+                (void)uart0_write_byte(BL_ACK, UART0_TIMEOUT_MAX);
+            }
+            else
+            {
+                (void)uart0_write_byte(BL_NACK, UART0_TIMEOUT_MAX);
+            }
             break;
 
         default:
-            (void)uart0_write_byte('N', UART0_TIMEOUT_MAX);
+            (void)uart0_write_byte(BL_NACK, UART0_TIMEOUT_MAX);
             break;
     }
 }

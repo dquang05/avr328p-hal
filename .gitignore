@@ -7,3 +7,4 @@ include/
 .vscode/extensions.json
 .vscode/ipch
 .test
+tools/.venv/
